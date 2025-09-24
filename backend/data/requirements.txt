@@ -1,0 +1,4 @@
+requests
+idna
+publicsuffix2
+flask
