@@ -1,23 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-whois_enrich.py
-- 先從 data/sites.json 收集所有需要的 main domain（含推測/解析）
-- 對「去重後」的 domain 進行併發查詢（Domain Admin → RDAP fallback），且自動重試
-- 查到的 registrar / expiry 以快取保存（成功與失敗 TTL 分開）
-- 再把結果回填到每一筆 rows；最後覆寫 data/sites.json
-
-環境變數（可選）：
-  WHOIS_CACHE_TTL    成功快取秒數（預設 86400）
-  WHOIS_ERROR_TTL    失敗快取秒數（預設 300）
-  WHOIS_WORKERS      併發查詢數（預設 12）
-  WHOIS_API_URL      Domain Admin API base，例如 https://k8s-dns.msgcloud.net
-  WHOIS_USER         Domain Admin 帳號
-  WHOIS_PASS         Domain Admin 密碼
-  VERIFY_SSL         1/0（預設 1）
-"""
-
 import os
 import re
 import json
@@ -176,7 +159,6 @@ def _da_lookup(domain: str, token: Optional[str]) -> Tuple[Optional[str], Option
         j = r.json()
         raw = (j.get("data") or {}).get("raw_data") or j.get("whoisraw") or ""
         if not raw:
-            # 有些實作會把值塞在 text 內，備援
             raw = r.text or ""
         raw = raw.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -268,7 +250,6 @@ def _lookup_with_retry(domain: str, token: Optional[str]) -> Dict[str, Any]:
         if reg or exp:
             return {"registrar": reg, "expiry": exp, "ok": True, "from_da": False}
 
-        # 下一輪重試前隨機 sleep（遞增 backoff + jitter）
         time.sleep(0.3 * attempt + random.random() * 0.2)
 
     return {"registrar": None, "expiry": None, "ok": False, "from_da": False}
@@ -284,7 +265,6 @@ def main():
     cache = _cache_load()
     token = _whois_login()
 
-    # 1) 先補 whois_domain（用 Domain Admin resolve 或猜測）
     unique_domains: Dict[str, None] = {}
     new_main = 0
 
@@ -298,9 +278,8 @@ def main():
             if d:
                 new_main += 1
         if d:
-            unique_domains[d] = None  # 去重
+            unique_domains[d] = None
 
-    # 2) 先從快取帶可用值，缺的再排入查詢
     domains_result: Dict[str, dict] = {}
     to_query = []
     for d in unique_domains.keys():
@@ -310,7 +289,6 @@ def main():
         else:
             to_query.append(d)
 
-    # 3) 併發查詢
     used_da = used_rdap = 0
     if to_query:
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
@@ -335,7 +313,6 @@ def main():
                 }
                 _cache_put(cache, d, res.get("registrar"), res.get("expiry"), ok=res["ok"])
 
-    # 4) 把結果回填到 rows
     hit_cache = len(unique_domains) - len(to_query)
     miss_cache = len(to_query)
     updated = 0
@@ -347,13 +324,11 @@ def main():
         res = domains_result.get(d) or _cache_get(cache, d) or {}
         reg = res.get("registrar") or ""
         exp = res.get("expiry") or ""
-        # 若前端已有更新的值，不覆蓋。這裡統一覆蓋（以 enrich 為準）。
         if r.get("registrar") != reg or r.get("domain_expiry") != exp:
             r["registrar"] = reg
             r["domain_expiry"] = exp
             updated += 1
 
-    # 5) 寫回資料與快取
     _dump_json(DATA_PATH, rows)
     _dump_json(CACHE_PATH, cache)
 

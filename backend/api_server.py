@@ -20,7 +20,6 @@ def _no_cache(resp):
 
 @app.after_request
 def add_common_headers(resp):
-    # /data 與前端資源都不快取（開發時好用）
     if request.path.startswith("/data/") or \
        request.path.startswith("/css/") or \
        request.path.startswith("/js/"):
@@ -30,10 +29,8 @@ def add_common_headers(resp):
 # ---------- 前端頁面 ----------
 @app.get("/")
 def index():
-    # ../frontend/index.html
     return send_from_directory(FRONTEND_DIR, "index.html")
 
-# 服務 /css/* 與 /js/* 靜態檔
 @app.get("/css/<path:filename>")
 def css_files(filename):
     resp = send_from_directory(FRONTEND_DIR / "css", filename)
@@ -47,14 +44,12 @@ def js_files(filename):
 # ---------- 提供資料 ----------
 @app.get("/data/<path:filename>")
 def data_files(filename):
-    # 讓前端以 /data/sites.json 直接拿最新資料
     resp = send_from_directory(DATA_DIR, filename)
     return _no_cache(resp)
 
 # ---------- API ----------
 @app.post("/api/run_zbx")
 def run_zbx():
-    """執行 backend/run_zbx.sh：抓 Zabbix、補 whois，再讓前端重抓 /data/sites.json"""
     try:
         proc = subprocess.run(
             ["bash", "./run_zbx.sh"],
@@ -75,5 +70,4 @@ def healthz():
     return jsonify({"ok": True, "cwd": str(BASE_DIR)})
 
 if __name__ == "__main__":
-    # python3 api_server.py
     app.run(host="0.0.0.0", port=8787)

@@ -5,6 +5,7 @@ from datetime import datetime
 import requests
 from urllib.parse import urlparse
 
+# ---------- 環境變數 / 參數 ----------
 ZBX_URL  = os.getenv("ZBX_URL",  "http://10.227.92.147:8080/api_jsonrpc.php")
 ZBX_USER = os.getenv("ZBX_USER", "api-read-web")
 ZBX_PASS = os.getenv("ZBX_PASS", "")
@@ -16,8 +17,10 @@ REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
 HEADERS = {"Content-Type":"application/json-rpc"}
 SEV_ORDER = {"OK":1,"Info":2,"Warning":3,"Average":4,"High":5,"Disaster":6}
 
+# ---------- HTTP Session ----------
 s = requests.Session(); s.trust_env = False
 
+# ---------- Zabbix API ----------
 def zbx_call(method, params, auth=None, req_id=1):
     payload = {"jsonrpc":"2.0","method":method,"params":params,"id":req_id}
     if auth: payload["auth"] = auth
@@ -38,6 +41,7 @@ def fetch_items(auth):
         "limit":100000
     }, auth, 2)
 
+# ---------- 解析工具 ----------
 def parse_site(key_):
     m = re.search(r"\[([^\]]+)\]", key_)
     return m.group(1) if m else None
@@ -50,7 +54,7 @@ def status_from_code(code_str):
     try: c = int(code_str) if code_str not in (None,"") else None
     except ValueError: c = None
     if c is None or c == 0: return "unknown","Info"
-    if c == 101: return "up","OK"           # WebSocket 握手
+    if c == 101: return "up","OK"
     if 200 <= c < 400: return "up","OK"
     if c >= 400: return "down","High"
     return "down","Warning"
@@ -59,6 +63,7 @@ def ts_human(epoch_str):
     try: return datetime.fromtimestamp(int(epoch_str)).strftime("%Y-%m-%d %H:%M:%S")
     except: return ""
 
+# ---------- 主流程 ----------
 def main():
     os.makedirs(os.path.dirname(OUTPUT_PATH) or ".", exist_ok=True)
     print(f"[INFO] Login {ZBX_URL} as {ZBX_USER}", file=sys.stderr)
@@ -85,7 +90,6 @@ def main():
             "itemid": it.get("itemid",""),
             "key_": key_,
             "hostid": it.get("hostid",""),
-            # 預留欄位（由 B 腳本填入）
             "whois_domain": "",
             "domain_expiry": ""
         })
