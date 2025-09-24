@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web Monitor</title>
+    <!-- Tailwind（CDN） -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 你的客製樣式（含欄寬拖曳外觀等） -->
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body class="bg-slate-50 text-slate-800">
+    <!-- 置頂控制列（固定） -->
+    <div class="sticky top-0 z-50 shadow-sm border-b border-slate-200 bg-slate-50/95 backdrop-blur">
+      <div class="max-w-full mx-auto px-6 pt-4 pb-3">
+        <h1 class="text-2xl font-bold mb-3">公司網頁監控列表</h1>
+        <div class="flex flex-wrap items-center gap-3">
+          <input
+            id="q"
+            type="search"
+            placeholder="搜尋 site / BU / host / key（可用空白分隔多關鍵字）"
+            class="border rounded-lg px-3 py-2 w-72"
+          />
+          <label class="inline-flex items-center gap-2">
+            <input id="dupOnly" type="checkbox" class="accent-slate-700" />
+            <span>只看重複的 site</span>
+          </label>
+          <label class="inline-flex items-center gap-2">
+            <input id="badOnly" type="checkbox" class="accent-slate-700" />
+            <span>只看非 2xx/3xx（down/unknown）</span>
+          </label>
+          <select id="bu" class="border rounded-lg px-2 py-2">
+            <option value="">全部 BU</option>
+          </select>
+
+          <button id="reload" class="border rounded-lg px-3 py-2">重新載入</button>
+
+          <!-- 勾選/匯出控制 -->
+          <button id="btnSelectVisible" class="border rounded-lg px-3 py-2">全選目前結果</button>
+          <button id="btnExportCsv" class="border rounded-lg px-3 py-2">匯出選取 CSV</button>
+          <button id="btnClearSel" class="border rounded-lg px-3 py-2">清除選取</button>
+
+          <span id="meta" class="text-sm text-slate-500"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 表格 -->
+    <main class="max-w-full mx-auto px-6 pt-3">
+      <div class="bg-white rounded-xl shadow overflow-hidden">
+        <!-- 表頭（固定於容器頂端） -->
+        <div class="overflow-hidden">
+          <table id="tbl-head" class="w-full text-sm table-fixed">
+            <colgroup id="colgroup-head">
+              <col style="width:42px" />
+              <col style="width:72px" />
+              <col style="width:280px" />
+              <col style="width:200px" />
+              <col style="width:150px" />
+              <col style="width:240px" />
+              <col style="width:80px" />
+              <col style="width:100px" />
+              <col style="width:160px" />
+              <col style="width:140px" />
+              <col style="width:100px" />
+              <col style="width:420px" />
+            </colgroup>
+            <thead class="bg-slate-100 text-slate-600 select-none">
+              <tr>
+                <!-- 全選（針對目前結果） -->
+                <th class="p-2 text-left border-r th-resizable">
+                  <input id="chkAllHead" type="checkbox" class="accent-slate-700" />
+                  <div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable" data-sort="bu">
+                  <span class="th-label cursor-pointer">BU</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable" data-sort="site">
+                  <span class="th-label cursor-pointer">Site</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable" data-sort="whois_domain">
+                  <span class="th-label cursor-pointer">Main Domain</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable" data-sort="domain_expiry">
+                  <span class="th-label cursor-pointer">到期日</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable" data-sort="registrar">
+                  <span class="th-label cursor-pointer">Registrar</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable" data-sort="code">
+                  <span class="th-label cursor-pointer">Code</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable" data-sort="available">
+                  <span class="th-label cursor-pointer">Status</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable" data-sort="ts">
+                  <span class="th-label cursor-pointer">Time</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable">
+                  <span class="th-label">Host</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left border-r th-resizable">
+                  <span class="th-label">itemid</span><div class="resizer"></div>
+                </th>
+                <th class="p-2 text-left th-resizable">
+                  <span class="th-label">key_</span><div class="resizer"></div>
+                </th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+
+        <!-- 表身（資料表，滾動） -->
+        <div id="tbl-wrap" class="overflow-auto">
+          <table id="tbl-body" class="w-full text-sm table-fixed">
+            <colgroup id="colgroup-body">
+              <col style="width:42px" />
+              <col style="width:72px" />
+              <col style="width:280px" />
+              <col style="width:200px" />
+              <col style="width:150px" />
+              <col style="width:240px" />
+              <col style="width:80px" />
+              <col style="width:100px" />
+              <col style="width:160px" />
+              <col style="width:140px" />
+              <col style="width:100px" />
+              <col style="width:420px" />
+            </colgroup>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- 主程式（載入資料、排序/篩選、欄寬拖曳、勾選/匯出） -->
+    <script defer src="./js/main.js"></script>
+  </body>
+</html>

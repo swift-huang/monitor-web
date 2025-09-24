@@ -1,0 +1,16 @@
+/* 欄寬拖曳把手 */
+.th-resizable { position: relative; }
+.th-label { pointer-events: auto; }
+.resizer {
+  position:absolute; right:0; top:0;
+  width:8px; height:100%;
+  cursor: col-resize; user-select:none; z-index:20;
+}
+.resizer:hover { background: rgba(0,0,0,.06); }
+.no-select, .no-select * { user-select: none !important; }
+
+/* 表身高度大一些，減少卷軸到底部的機會 */
+#tbl-wrap { max-height: 83vh; }
+
+/* 表頭底線讓分隔更明顯 */
+#tbl-head { border-bottom:1px solid rgb(226 232 240); }
