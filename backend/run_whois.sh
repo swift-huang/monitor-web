@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+APP_ROOT="/opt/monitor-web"
+VENV="$APP_ROOT/venv"
+BACKEND="$APP_ROOT/backend"
+LOG_DIR="/var/log/monitor-web"
 
-if [ -f "../.env" ]; then
-  set -a; source ../.env; set +a
+mkdir -p "$BACKEND/data" "$BACKEND/cache" "$LOG_DIR"
+
+cd "$BACKEND"
+
+if [ -f "$APP_ROOT/.env" ]; then
+  set -a; source "$APP_ROOT/.env"; set +a
 fi
 
-mkdir -p ./data ./cache
+exec "$VENV/bin/python3" -u whois_enrich.py 2>&1 | tee -a "$LOG_DIR/whois.log"
 
-export SITES_PATH="./data/sites.json"
-export OUTPUT_PATH="./data/sites.json"
-export WHOIS_CACHE_PATH="./cache/whois.json"
-
-python3 whois_enrich.py
-
-echo "[OK] run_whois.sh done"

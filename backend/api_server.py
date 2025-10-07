@@ -5,8 +5,8 @@ from flask import Flask, jsonify, request, send_from_directory
 import subprocess, os, time, pathlib
 
 # ---- 基本設定 ----
-BASE_DIR = pathlib.Path(__file__).resolve().parent
-FRONTEND_DIR = (BASE_DIR / "../frontend").resolve()
+BASE_DIR = pathlib.Path(__file__).resolve().parent              # /opt/monitor-web/backend
+FRONTEND_DIR = (BASE_DIR / "../frontend").resolve()             # /opt/monitor-web/frontend
 DATA_DIR = (BASE_DIR / "data").resolve()
 os.chdir(BASE_DIR)
 
@@ -20,9 +20,11 @@ def _no_cache(resp):
 
 @app.after_request
 def add_common_headers(resp):
-    if request.path.startswith("/data/") or \
-       request.path.startswith("/css/") or \
-       request.path.startswith("/js/"):
+    if (request.path.startswith("/data/") or
+        request.path.startswith("/css/")  or
+        request.path.startswith("/js/")   or
+        request.path.startswith("/images/") or
+        request.path == "/favicon.ico"):
         _no_cache(resp)
     return resp
 
@@ -40,6 +42,19 @@ def css_files(filename):
 def js_files(filename):
     resp = send_from_directory(FRONTEND_DIR / "js", filename)
     return _no_cache(resp)
+
+# 新增：images 與 favicon
+@app.get("/images/<path:filename>")
+def image_files(filename):
+    return send_from_directory(FRONTEND_DIR / "images", filename)
+
+@app.get("/favicon.ico")
+def favicon():
+    # 優先從 images/ 取；若未來你保留根目錄 symlink 也能 fallback
+    img_dir = FRONTEND_DIR / "images"
+    if (img_dir / "favicon.ico").exists():
+        return send_from_directory(img_dir, "favicon.ico")
+    return send_from_directory(FRONTEND_DIR, "favicon.ico")
 
 # ---------- 提供資料 ----------
 @app.get("/data/<path:filename>")
@@ -71,3 +86,4 @@ def healthz():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8787)
+

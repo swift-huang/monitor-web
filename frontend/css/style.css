@@ -14,3 +14,10 @@
 
 /* 表頭底線讓分隔更明顯 */
 #tbl-head { border-bottom:1px solid rgb(226 232 240); }
+
+/* 允許欄位換行 */
+td {
+  white-space: normal;
+  word-break: break-word;
+}
+

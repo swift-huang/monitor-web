@@ -1,5 +1,6 @@
 (function () {
-  const DATA_URL = "/data/sites.json";
+  // 由單一改為多來源：Zabbix + Other（若 other 檔不存在會自動忽略）
+  const DATA_URLS = ["/data/sites.json", "/data/sites_other.json"];
   const API_RUN_ZBX = "/api/run_zbx";
   const $ = (id) => document.getElementById(id);
 
@@ -64,7 +65,19 @@
 
   // ===== 資料載入 =====
   async function load() {
-    const data = await fetchJSON(DATA_URL);
+    // 同時抓兩份，容錯：其中一份失敗則回傳空陣列
+    const datasets = await Promise.all(
+      DATA_URLS.map(async (url) => {
+        try {
+          return await fetchJSON(url);
+        } catch (_) {
+          return [];
+        }
+      })
+    );
+
+    // 合併：Zabbix 在前，Other 在後
+    const data = datasets.flat();
 
     // 建立 BU 下拉
     const buSet = new Set(data.map((x) => x.bu).filter(Boolean));
@@ -75,7 +88,7 @@
         .map((b) => `<option value="${b}">${b}</option>`)
         .join("");
 
-    // 標記重複
+    // 標記重複（跨來源一起計數）
     const siteCount = {};
     data.forEach((x) => (siteCount[x.site] = (siteCount[x.site] || 0) + 1));
 
@@ -159,7 +172,7 @@
               <input type="checkbox" class="rowchk accent-slate-700" data-id="${id}" ${checked}>
             </td>
             <td class="p-2">${r.bu || ""}</td>
-            <td class="p-2">${r.site}</td>
+            <td class="p-2">${r.display_name || r.site}</td>
             <td class="p-2">${r.whois_domain || "—"}</td>
             <td class="p-2">${expiryBadge(r.domain_expiry || "")}</td>
             <td class="p-2">${r.registrar || "—"}</td>
@@ -330,15 +343,24 @@
       "key_",
     ];
 
-    const escape = (v) => {
-      const s = (v ?? "").toString().replace(/"/g, '""');
+    // 依欄位做適當轉換與引用（CSV 安全）
+    const escapeField = (value, col) => {
+      let s = (value ?? "").toString();
+
+      // BU 若是純數字（例如 09），用前置單引號讓 Excel 以文字處理，保留前導 0
+      if (col === "bu" && /^\d+$/.test(s)) {
+        s = "'" + s; // 變成 '09，Excel 讀入後會顯示 09
+      }
+
+      // 一般 CSV 轉義：把雙引號變成兩個雙引號，然後整欄再用雙引號包住
+      s = s.replace(/"/g, '""');
       return `"${s}"`;
     };
 
     const lines = [];
-    lines.push(headers.map(escape).join(","));
+    lines.push(headers.map((h) => `"${h.replace(/"/g, '""')}"`).join(","));
     rows.forEach((r) => {
-      lines.push(cols.map((c) => escape(r[c])).join(","));
+      lines.push(cols.map((c) => escapeField(r[c], c)).join(","));
     });
 
     const csv = "\uFEFF" + lines.join("\n"); // UTF-8 BOM
@@ -396,3 +418,4 @@
     });
   });
 })();
+
